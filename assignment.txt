@@ -1,0 +1,238 @@
+CSE303 - Fall 2016
+Assignment #3: The "User-Level Rootkit" and Defense
+
+Purpose and General Guidelines:
+
+  We typically do not write code that makes system calls directly.  Instead,
+  we usually rely on a library (the "C standard library") to wrap system
+  calls in stub code that abstracts away differences among possible
+  underlying operating systems.  This greatly simplifies programming.
+
+  In order to increase security, we typically store the C standard library as
+  a shared object (a .so file in Unix, a .dll in Windows).  If a bug or
+  security flaw is found in the library, we can simply replace it, and all
+  programs will get the new version when they are executed.
+
+  However, anyone with shell access can override the default location of a
+  shared library.  This is, for example, one way to implement tools like
+  valgrind, from Assignment #1: we can override the locations of malloc and
+  free, replacing them with special versions that count and track memory, and
+  then call the original malloc and free.  This technique is known as library
+  interpositioning.
+
+  There is a dark side, though.  Anyone with shell access can override the
+  default location of a shared library!  This opens the door to "userland
+  rootkits", which can hijack the I/O of a program by sitting between the
+  program and the kernel.
+
+  In this project, we will create a very simple userland rootkit.  The
+  rootkit will be simpler than what a person with malicious intent would use,
+  but it allows us to appreciate aspects of security, trust, and protection
+  via hands-on experience.  As the assignment progresses, you will be
+  expected to create an attack, then a defense.  As you do so, we encourage
+  you to think about the "cat and mouse" game that ensues.  The defense you
+  create could be circumvented, once the attacker learns of it.  But the
+  counter-offense could also be circumvented, back and forth, for quite some
+  time.
+
+  Note, too, that library interpositioning is a powerful technique for making
+  extensible code.  This isn't just about doing evil things... loading code
+  on the fly is the key to high-availability customizable web servers and
+  other tools.
+  
+  This is a team assignment.  Students may work in groups of two.  Every bit
+  of code that a team submits as part of this assignment should be their own
+  work.  You may consult question-and-answer websites such as StackOverflow
+  to see how other people have tried, failed, and then received assistance in
+  their attempts at these and similar problems.  However, you may not use
+  other people's code.  Be conservative in your judgment.  Anything on GitHub
+  is obviously off limits.  Anything copied verbatim from the web is
+  unacceptable.  Anything written by your classmates is off limits.  By this
+  point in your academic career, you should know how to be ethical.
+
+Getting the Files
+
+  The source code that you will be editing can be found in the
+  /proj/spear0 folder on the sunlab machines.  From your sunlab
+  account, you should make a protected folder where you will work on this
+  project, then copy the source code and unpack it.  You should know how to
+  do this by now, but just in case you don't, here is a sequence of commands
+  that should work, once you are logged into the sunlab:
+  
+    cd ~/
+    mkdir cse303
+    chmod 700 cse303
+    cd cse303
+    tar -xzvf /proj/spear0/cse303_p3.tgz
+
+  This will create a subfolder with the project 3 source code in it.  The
+  assignment requires you to edit the files in the folder to complete several
+  tasks.
+
+Task #0: Tell us who you are
+
+  You should edit the 'team.c' file to provide the name and email of each
+  member of your team.  Until you do this, none of your programs will
+  execute.
+  
+Task #1: Explore mechanisms for loading shared objects
+
+  The "libpart1.c" file contains a simple function.  When it compiles, it
+  complies to a shared object (a ".so") that can be loaded into a program at
+  run-time, or dynamically linked at load time.
+
+  1 - Your first sub-task is to learn a bit about the difference between
+      run-time and load-time use of shared objects.  We have provided some
+      starter code called libpart1.c and part1a.c.  The Makefile will build
+      libpart1.c to a shared object, such that its methods can be invoked by
+      part1a.  This entails the use of the "-L" and "-l" flags at link time,
+      so that the compiler can ensure that the function names expected by
+      part1a are present in libpart1.  It also entails the use of the
+      LD_LIBRARY_PATH environment variable to tell the run-time loader where
+      to find libpart1.so, since we are not putting it in a standard
+      location.  We do this for you: the Makefile has a special rule for the
+      part1a executable, and part1a.sh will execute your part1a code with the
+      environment correctly configured.
+
+      With that as background, notice the signature of the "hello()" function
+      in libpart1.c.  It takes a void*, and it returns a void*.  By packaging
+      the paramters as structs, it is possible to use this one signature for
+      any behavior, via some careful casting.
+
+      To complete part1a, you should add a new function to libpart1 called
+      'ucase'.  It should have the same signature as 'hello', but it should
+      expect that it is given the address of a team struct as its parameter.
+      Internally, ucase should (1) allocate a new team struct, (2) copy the
+      fields of the parameter struct to the fields of the new team struct,
+      and then (3) uppercase those fields.  You should also modify part1a.c
+      so that it (1) prints the contents of the new struct, in a manner
+      similar to check_team(), and (2) takes appropriate action to ensure
+      there are no memory leaks reported by valgrind.
+
+  2 - Your second sub-task is to explore mechanisms for dynamic loading of
+      shared objects.  The part1b.c file contains an incomplete function
+      called load_and_invoke().  You will need to modify the getopt code in
+      main(), and then modify load_and_invoke(), so that it uses dlopen(),
+      dlsym(), and dlclose() to load a shared object, execute a function, and
+      close the shared object.  Be sure to handle errors correctly.  You
+      should test this function using, at a minimum, the same "libpart1.so"
+      file from the first sub-task.  You should be able to get hello() to
+      execute from your part1b executable without modifying the Makefile or
+      modifying LD_LIBRARY_PATH.
+
+Task #2: Implement basic interpositioning
+
+  Interpositioning is the mechanism by which we have two .so files which
+  provide the same function name, and one of the versions of the function
+  makes use of the other.  The trick to doing this is to use the dlsym()
+  function with a special handle, RTLD_NEXT, to indicate that the original
+  .so can be found by traversing the library path.  We will create code that
+  mimics the behavior of valgrind.
+
+  Your implementation of malloc() and free() should provide the following
+  functionality:
+
+    - You should interpose on malloc() and free() but still call the original
+      malloc() and free() functions.  Your goal is *not* to implement your
+      own allocator.
+  
+    - You should count the total number of calls to malloc() and free().
+      When your shared library exits, your destructor should print the number
+      of un-freed blocks.
+
+    - You should use the GNU backtrace library (the backtrace() function is
+      defined in execinfo.h) to get both the name of the module that called
+      malloc, and the value of the program counter at the time when malloc
+      was called.  Be sure to read the man page for backtrace.  This is an
+      amazing tool, which you have seen in use before (e.g., when typing 'bt'
+      inside of gdb).
+
+    - You should complete part2_hash.cc, so that on each malloc() you can
+      save the results of backtrace(), and on each free() you can "forget"
+      some of the saved information.  Then, when your .so is unloaded, you
+      should use a destructor to dump the contents of the map.
+
+  Putting it all together, it should be possible to LD_PRELOAD your
+  libpart2.so file, and run an arbitrary program.  When the program exits,
+  your library should automatically report the number of unfreed allocations,
+  and the call sites of those allocations.
+      
+  Note: You can use the "__attribute__((constructor))" and
+        "__attribute__((destructor))" annotations to indicate that a specific
+        function in your .so should run when the .so is loaded or unloaded.
+        You should leverage this in order to get map_dump() to behave
+        correctly.
+
+  Note: This is a single task, but it involves a fair bit of work.  Be sure
+        to break the problem into sub-parts and solve them incrementally.
+
+  Note: It is possible that backtrace() uses malloc() and free().  You may
+        need to use a static flag within your malloc() and free()
+        implementations to enable/disable backtraces, so that backtrace()
+        mallocs don't lead to infinite recursion.
+  
+Task #3: Create a rootkit
+
+  Now we'll use library interpositioning to snoop on the behavior of a
+  program.  Our rootkit will watch all printf and scanf operations, and do
+  malicious things with the program output.
+
+  The 'inout.c' file produces a simple program that reads from stdin and
+  writes to stdout, using scanf and printf.  You can use this as a way to
+  test your rootkit.
+
+  In libpart3.c, you should count the number of calls to printf() and
+  scanf().  Once four total calls have been made, your library should enter
+  its evil mode.  At a minimum, it should use fork(), dup2(), and pipe().
+  The desired behavior is that your library should fork a new process, and
+  redirect all of the program's output to the child process.  That process
+  should behave like the Unix 'tee' program: it should write its output to
+  STDOUT, and also write its output to a file.  The name of the file should
+  be "evil.txt", unless there is an environment variable named EVILFILENAME,
+  in which case the value of that environment variable should be used.
+  Finally, when the parent process terminates, the child process should
+  perform its final evil action: it should use dlopen to load libexploit.so,
+  and libexploit.so should output the captured portion of the output.  You
+  will need to update libexploit.c to provide this behavior.
+
+  While this exploit is benign, we could have done much worse: we could have
+  sent the captured output to a remote server, or it could have downloaded
+  the libexploit.so code from a remote server!
+
+  Note: To test your code, you will need to make use of the LD_PRELOAD
+  environment variable.
+      
+Task #4: Prevent the rootkit
+
+  Finally, let's try to prevent the rootkit.  We want to achieve fail-stop
+  behavior, but at the point where we detect that our program has been
+  hijacked, there isn't much that we can do.  Our solution will be to use
+  mprotect() to make the process's code un-executable, so that continuing to
+  run the program will cause a segmentation fault.
+
+  To achieve our desired behavior, we will create ANOTHER .so that can be
+  LD_PRELOADed.  The libpart4.c file will interposition on pipe().  That's a
+  pretty obvious choice, because we don't expect inout to create pipes.
+  Note that what we really want to do is interpose on dlsym itself, but
+  that's really tricky.  See, for example,
+  http://stackoverflow.com/questions/15599026/how-can-i-intercept-dlsym-calls-using-ld-preload
+
+  On any call to pipe, your version of pipe will use backtrace() to
+  determine if the call to is coming from printf() or scanf().  If not, you
+  should pass through to the original pipe code.  In the event that the
+  call to pipe() is from printf() or scanf(), you should immediately use
+  mprotect() to make the code page of *your* pipe() function
+  non-executable.  Continued execution of your program should then cause a
+  segfault.
+
+Turn-In Instructions
+
+  To turn in your solutions, type 'make turnin'.
+
+  You may turn in your solutions as many times as you like.  The last turn-in
+  received before grading begins is the only turn-in that will be graded.
+
+  Any task whose code does not compile will receive 0 points.
+    
+  If you choose to work in a team, please perform all turn-ins from the same
+  account.
