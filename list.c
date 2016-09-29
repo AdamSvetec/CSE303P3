@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <stdlib.h>
+#include <string.h>
+
+/* called upon library unload */
+void map_dump() __attribute__((destructor));
+
 /*
  * Note: 'uintptr_t' is a special type of unsigned integer that is guaranteed
  *       to be the same size as pointers.  This is the preferred way to cast
@@ -19,7 +25,35 @@ typedef struct map_node
   uintptr_t allocated_pointer;
   char      *call_site;
   char      *program_counter;
-} map_node_t;
+  struct map_node * next;
+}map_node_t;
+
+map_node_t * create_map_node(uintptr_t pointer, char * module, char * line){
+  map_node_t * node = malloc(sizeof(map_node_t));
+  node->allocated_pointer = pointer;
+  node->call_site = malloc(strlen(module)+1);
+  node->program_counter = malloc(strlen(line)+1);
+  strcpy(node->call_site, module);
+  strcpy(node->program_counter, line);
+  node->next = NULL;
+  return node;
+}
+
+void free_map_node(map_node_t * node){
+  free(node->call_site);
+  free(node->program_counter);
+  free(node);
+}
+
+static int interop_skip = 0;
+
+int get_interop_skip(){
+  return interop_skip;
+}
+
+void set_interop_skip(int val){
+  interop_skip = val;
+}
 
 /*
  * A list, based on map_node_t
@@ -37,7 +71,28 @@ static map_node_t* alloc_info;
  *            map.
  */
 int map_insert(uintptr_t pointer, char *module, char *line) {
-  /* TODO: complete this code */
+  /* will this create malloc loop? */
+  map_node_t * insert = create_map_node(pointer, module, line);
+  if(alloc_info == NULL){
+    alloc_info = insert;
+    return 1;
+  }else if(alloc_info->allocated_pointer == pointer){
+    free_map_node(insert);
+    return 0;
+  }
+
+  map_node_t * node_ptr = alloc_info->next;
+  map_node_t * prev_ptr = alloc_info;
+  while(node_ptr != NULL){
+    if(pointer == node_ptr->allocated_pointer){
+      free_map_node(insert);
+      return 0;
+    }
+    prev_ptr = node_ptr;
+    node_ptr = node_ptr->next;
+  }
+  prev_ptr->next = insert;
+  return 1;
 }
 
 /*
@@ -50,7 +105,26 @@ int map_insert(uintptr_t pointer, char *module, char *line) {
  *            map (which would suggest a double-free).
  */
 int map_remove(uintptr_t pointer) {
-  /* TODO: complete this code */
+  if(alloc_info == NULL){
+    return 0;
+  }else if(alloc_info->allocated_pointer == pointer){
+    map_node_t * to_delete = alloc_info;
+    alloc_info = alloc_info->next;
+    free_map_node(to_delete);
+    return 1;
+  }
+  map_node_t * prev_ptr = alloc_info;
+  map_node_t * node_ptr = alloc_info->next;
+  while(node_ptr != NULL){
+    if(node_ptr->allocated_pointer == pointer){
+      prev_ptr->next = node_ptr->next;
+      free_map_node(node_ptr);
+      return 1;
+    }
+    prev_ptr = node_ptr;
+    node_ptr = node_ptr->next;
+  }
+  return 0;
 }
 
 /*
@@ -58,17 +132,26 @@ int map_remove(uintptr_t pointer) {
  *           that there are un-freed allocations (memory leaks).
  */
 int map_count() {
-  /* TODO: complete this code */
-  return -1;
+  int count = 0;
+  map_node_t *node_ptr = alloc_info;
+  while(node_ptr != NULL){
+    count++;
+    node_ptr = node_ptr->next;
+  }
+  return count;
 }
 
 /*
  * dump() - output the contents of the list
  */
 void map_dump() {
-  /* TODO: complete this code */
   map_node_t* curr = alloc_info;
-  while (curr) {
-    printf("  0x%x allocated by %s::%s", -1, "-1", "-1");
+  map_node_t* to_free;
+  set_interop_skip(1);
+  while(curr) {
+    printf("  0x%x allocated by %s::%s\n", curr->allocated_pointer, curr->call_site, curr->program_counter);
+    to_free = curr;
+    curr = curr->next;
+    free_map_node(to_free);
   }
 }
