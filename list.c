@@ -148,6 +148,7 @@ void map_dump() {
   map_node_t* curr = alloc_info;
   map_node_t* to_free;
   set_interop_skip(1);
+  printf("number of un-freed allocations: %d\n", map_count());
   while(curr) {
     printf("  0x%x allocated by %s::%s\n", curr->allocated_pointer, curr->call_site, curr->program_counter);
     to_free = curr;
