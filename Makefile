@@ -38,7 +38,7 @@ all: $(EXEFILES) $(SOFILES)
 # Rules for building object files
 $(ODIR)/%.o: %.c
 	@echo "[CC] $< --> $@"
-	@$(CC) $< -o $@ -c $(CFLAGS)
+	@$(CC) $< -o $@ -c $(CFLAGS) $(SOFLAGS)
 
 # Rules for building executables
 $(ODIR)/%: $(ODIR)/%.o $(OFILES)
@@ -54,6 +54,7 @@ $(ODIR)/part1a: $(ODIR)/part1a.o $(OFILES) $(SOFILES)
 $(ODIR)/%.so: %.c
 	@echo "[CC] $< --> $@"
 	@$(CC) $< -o $@ $(CFLAGS) $(SOFLAGS)
+
 # NB: custom rule for libpart2.so
 $(ODIR)/libpart2.so: libpart2.c $(ODIR)/list.o
 	@echo "[CC] $^ --> $@"
