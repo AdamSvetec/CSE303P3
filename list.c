@@ -71,27 +71,17 @@ static map_node_t* alloc_info;
  *            map.
  */
 int map_insert(uintptr_t pointer, char *module, char *line) {
-  /* will this create malloc loop? */
   map_node_t * insert = create_map_node(pointer, module, line);
   if(alloc_info == NULL){
     alloc_info = insert;
     return 1;
-  }else if(alloc_info->allocated_pointer == pointer){
-    free_map_node(insert);
-    return 0;
   }
 
-  map_node_t * node_ptr = alloc_info->next;
-  map_node_t * prev_ptr = alloc_info;
-  while(node_ptr != NULL){
-    if(pointer == node_ptr->allocated_pointer){
-      free_map_node(insert);
-      return 0;
-    }
-    prev_ptr = node_ptr;
+  map_node_t * node_ptr = alloc_info;
+  while(node_ptr->next != NULL){
     node_ptr = node_ptr->next;
   }
-  prev_ptr->next = insert;
+  node_ptr->next = insert;
   return 1;
 }
 
