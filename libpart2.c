@@ -70,7 +70,9 @@ void free(void *ptr){
   }else{
     //printf("tracked free\n");
     set_interop_skip(1);
-    map_remove((uintptr_t)ptr);
+    if(0 == map_remove((uintptr_t)ptr)){
+      //this node has already been removed
+    }
     set_interop_skip(0);
   }
 }
