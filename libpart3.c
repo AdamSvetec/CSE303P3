@@ -20,15 +20,15 @@ When parent of evil child dies, this is called
 It loads libexploit.so and calls exploit()
 -Does not close file
  */
-void parent_death(char * filename){
-  //does this need to be more flexible?
+void parent_death(FILE * evil_file){
+  //does this library open need to be more flexible
   void * handle = dlopen("obj64/libexploit.so", RTLD_NOW);
   if (!handle) {
     perror("unable to open libexploit.so");
     return;
   }
-  void (*exploit)(char *)=(void(*)(char *))(dlsym (handle, "exploit"));
-  exploit(filename);
+  void (*exploit)(FILE *)=(void(*)(FILE *))(dlsym (handle, "exploit"));
+  exploit(evil_file);
   dlclose(handle);
 }
 
@@ -38,12 +38,12 @@ Loop for reading from pipe and redirecting that output to stdout and file
 void evil_process_loop(int pipe_fd){
   FILE * evil;
   //check for env variable specifying filename to write output
-  const char* env_evil = getenv("EVILFILENAME");
-  if(env_evil == NULL){
+  const char* evil_filename = getenv("EVILFILENAME");
+  if(evil_filename == NULL){
     evil = fopen("evil.txt", "w");
-    env_evil = "evil.txt";
+    evil_filename = "evil.txt";
   }else{
-    evil = fopen(env_evil, "w");
+    evil = fopen(evil_filename, "w");
   }
   if(evil == NULL){
     perror("Unable to open output file");
@@ -66,13 +66,9 @@ void evil_process_loop(int pipe_fd){
   fclose(evil);
   close(pipe_fd);
 
-  char cwd[1024];
-  char * pathname;
-  getcwd(cwd, sizeof(cwd));
-  pathname = strcat(cwd, "/");
-  pathname = strcat(pathname, env_evil);
-  parent_death(pathname);
-
+  FILE * evil_file_read = fopen(evil_filename, "r");
+  parent_death(evil_file_read);
+  fclose(evil_file_read);
   exit(1);
 }
 
