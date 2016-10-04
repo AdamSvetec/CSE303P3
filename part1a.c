@@ -17,6 +17,8 @@ void help(char *progname) {
  */
 extern void *hello(void* param);
 
+extern void *ucase(struct team_t team_c);
+
 /*
  * main() - The main routine parses arguments and invokes hello
  */
@@ -38,6 +40,6 @@ int main(int argc, char **argv) {
     hello(NULL);
 
     /* TODO: execute the new function "ucase" that you added to libpart1.c */
-
+    ucase(team);
     exit(0);
 }

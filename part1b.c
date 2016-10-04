@@ -2,12 +2,33 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "support.h"
+#include <dlfcn.h>
 
 /*
  * load_and_invoke() - load the given .so and execute the specified function
  */
+typedef void* (*any)();
+
 void load_and_invoke(char *libname, char *funcname) {
-    /* TODO: complete this function */
+  /* TODO: complete this function */
+  void *handle;
+  char *error;
+  any function;;
+ 
+  handle = dlopen(libname, RTLD_NOW);;
+  if(!handle) {
+    fputs(dlerror(), stderr);
+    exit(1);
+    }
+
+  *(void **) (&function) = dlsym(handle, funcname);
+  if((error = dlerror()) != NULL){
+    fputs(error, stderr);
+    exit(1);
+    }
+  
+  (void)function();
+  dlclose(handle);
 }
 
 /*
@@ -26,6 +47,8 @@ void help(char *progname) {
 int main(int argc, char **argv) {
     /* for getopt */
     long opt;
+    char *libname = argv[1];
+    char *funcname = argv[2];
 
     /* run a student name check */
     check_team(argv[0]);
@@ -34,12 +57,12 @@ int main(int argc, char **argv) {
     /* the parameterless 'h' option, for getting help on program usage. */
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch(opt) {
-          case 'h': help(argv[0]); break;
-        }
+	case 'h': help(argv[0]); break; 
+	}
     }
 
     /* call load_and_invoke() to run the given function of the given library */
-    load_and_invoke(NULL, NULL);
+    load_and_invoke(libname, funcname);
 
     exit(0);
 }
