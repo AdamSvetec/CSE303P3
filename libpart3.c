@@ -54,9 +54,7 @@ void evil_process_loop(int pipe_fd){
   while(nbytes >= 0){
     readbuffer[nbytes] = '\0';
     printf(readbuffer); //write to stdout
-    if(!fprintf(evil, readbuffer)){ //write to file
-      perror("write to evil failed");
-    }
+    fprintf(evil, readbuffer); //write to file
     //If parent has died
     if(getppid() == 1){
       break;

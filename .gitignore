@@ -3,3 +3,4 @@
 *.o
 obj64/*
 test/testing
+evil.txt
