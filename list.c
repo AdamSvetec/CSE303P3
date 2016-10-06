@@ -1,3 +1,4 @@
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -43,6 +44,7 @@ void free_map_node(map_node_t * node){
   free(node->call_site);
   free(node->program_counter);
   free(node);
+  node = NULL;
 }
 
 static int interop_skip = 0;
@@ -135,14 +137,14 @@ int map_count() {
  * dump() - output the contents of the list
  */
 void map_dump() {
-  map_node_t* curr = alloc_info;
+  //map_node_t* curr = alloc_info;
   map_node_t* to_free;
   set_interop_skip(1);
-  printf("number of un-freed allocations: %d\n", map_count());
-  while(curr) {
-    printf("  0x%x allocated by %s::%s\n", curr->allocated_pointer, curr->call_site, curr->program_counter);
-    to_free = curr;
-    curr = curr->next;
+  printf("\nnumber of un-freed allocations: %d\n", map_count());
+  while(alloc_info) {
+    printf("  0x%x allocated by %s::%s\n", alloc_info->allocated_pointer, alloc_info->call_site, alloc_info->program_counter);
+    to_free = alloc_info;
+    alloc_info = alloc_info->next;
     free_map_node(to_free);
   }
 }
