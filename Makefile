@@ -54,11 +54,10 @@ $(ODIR)/part1a: $(ODIR)/part1a.o $(OFILES) $(SOFILES)
 $(ODIR)/%.so: %.c
 	@echo "[CC] $< --> $@"
 	@$(CC) $< -o $@ $(CFLAGS) $(SOFLAGS)
-
 # NB: custom rule for libpart2.so
 $(ODIR)/libpart2.so: libpart2.c $(ODIR)/list.o
 	@echo "[CC] $^ --> $@"
-	@$(CC) $^ -o $@ $(CFLAGS) $(SOFLAGS)
+	@$(CC) $^ -o $@ $(CFLAGS) $(SOFLAGS) -ldl
 
 # clean by clobbering the build folder
 clean:
