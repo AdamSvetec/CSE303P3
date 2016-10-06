@@ -47,17 +47,19 @@ void help(char *progname) {
 int main(int argc, char **argv) {
     /* for getopt */
     long opt;
-    char *libname = argv[1];
-    char *funcname = argv[2];
+    char *libname;
+    char *funcname;
 
     /* run a student name check */
     check_team(argv[0]);
 
     /* parse the command-line options.  For this program, we only support  */
     /* the parameterless 'h' option, for getting help on program usage. */
-    while ((opt = getopt(argc, argv, "h")) != -1) {
+    while ((opt = getopt(argc, argv, "hl:f:")) != -1) {
         switch(opt) {
-	case 'h': help(argv[0]); break; 
+	case 'h': help(argv[0]); break;
+	case 'l': libname = optarg; break;
+	case 'f': funcname = optarg; break;
 	}
     }
 
