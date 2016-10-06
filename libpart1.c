@@ -13,37 +13,40 @@ void *hello(void *input) {
     return NULL;
 }
 
-void *ucase(struct team_t team){
+/*
+  Make copy of team_t struct pointer and uppercase email and names
+  return pointer to newly allocated struct
+ */
+void *ucase(void *input){
   //allocate a new team struct
-  struct team_t new_team;
-  new_team.name1 = strdup(team.name1);
-  new_team.email1 = strdup(team.email1);
-  new_team.name2 = strdup(team.name2);
-  new_team.email2 = strdup(team.email2);
- 
-  //Copy fields of parameter struck to new team struct
-  memcpy(new_team.name1, team.name1, sizeof(team.name1));
-  memcpy(new_team.email1, team.email1, sizeof(team.email1));
-  memcpy(new_team.name2, team.name2, sizeof(team.name2));
-  memcpy(new_team.email2, team.email2, sizeof(team.email2));  
+  struct team_t * old_team = (struct team_t *) input;
+  struct team_t * new_team = malloc(sizeof(struct team_t));
 
-  //Capitalize team member names
-  for(int i = 0; new_team.name1[i] != '\0'; i++){
-    new_team.name1[i] = toupper(new_team.name1[i]);
+  new_team->name1 = malloc(strlen(old_team->name1)+1);
+  new_team->email1 = malloc(strlen(old_team->email1)+1);
+  new_team->name2 = malloc(strlen(old_team->name2)+1);
+  new_team->email2 = malloc(strlen(old_team->email2)+1);
+
+  strcpy(new_team->name1, old_team->name1);
+  strcpy(new_team->email1, old_team->email1);
+  strcpy(new_team->name2, old_team->name2);
+  strcpy(new_team->email2, old_team->email2);
+
+  for(int i = 0; i < strlen(new_team->name1); i++){
+    new_team->name1[i] = toupper(new_team->name1[i]);
   }
-  for(int j = 0; new_team.name2[j] != '\0'; j++){
-    new_team.name2[j] = toupper(new_team.name2[j]);
-    }
 
-  //Print contents of new struct
-  printf("Student1 : %s\n", new_team.name1);
-  printf("Email1 : %s\n", new_team.email1);
-  printf("Student2 : %s\n", new_team.name2);
-  printf("Email2 : %s\n", new_team.email2);
+  for(int i = 0; i < strlen(new_team->email1); i++){
+    new_team->email1[i] = toupper(new_team->email1[i]);
+  }
 
-  //Deallocate memory
-  free(new_team.name1);
-  free(new_team.email1);
-  free(new_team.name2);
-  free(new_team.email2);
+  for(int i = 0; i < strlen(new_team->name2); i++){
+    new_team->name2[i] = toupper(new_team->name2[i]);
+  }
+
+  for(int i = 0; i < strlen(new_team->email2); i++){
+    new_team->email2[i] = toupper(new_team->email2[i]);
+  }
+  
+  return new_team;
 }

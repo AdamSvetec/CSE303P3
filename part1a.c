@@ -17,7 +17,7 @@ void help(char *progname) {
  */
 extern void *hello(void* param);
 
-extern void *ucase(struct team_t team_c);
+extern void *ucase(void* input);
 
 /*
  * main() - The main routine parses arguments and invokes hello
@@ -40,6 +40,16 @@ int main(int argc, char **argv) {
     hello(NULL);
 
     /* TODO: execute the new function "ucase" that you added to libpart1.c */
-    ucase(team);
-    exit(0);
+    struct team_t * u_team = (struct team_t *) ucase(&team);
+    printf("\n");
+    printf("Student1 : %s\n", u_team->name1);
+    printf("Email1 : %s\n", u_team->email1);
+    printf("Student2 : %s\n", u_team->name2);
+    printf("Email2 : %s\n", u_team->email2);
+    
+    free(u_team->name1);
+    free(u_team->email1);
+    free(u_team->name2);
+    free(u_team->email2);
+    free(u_team);
 }
