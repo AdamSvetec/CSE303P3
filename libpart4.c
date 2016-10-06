@@ -9,7 +9,6 @@
  * dlsym(), as well as any constructors or destructors for your library.
  */
 
-/* TODO: Your code goes here */
 
 int check_backtrace(char ** strings, int length){
   return 1;
@@ -32,5 +31,5 @@ int pipe(int pipefd[2]){
     mprotect((void*)((uintptr_t)pipe_func_ptr - space_past_pagesize), (size_t)(space_past_pagesize+2), PROT_EXEC);
   }
 
-  return pipe(pipefd);  
+  return realpipe(pipefd);  
 }
